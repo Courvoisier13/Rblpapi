@@ -73,6 +73,8 @@ namespace bbg = BloombergLP::blpapi;	// shortcut to not globally import both nam
 namespace {
     const bbg::Name TICK_DATA("tickData");
     const bbg::Name COND_CODE("conditionCodes");
+    const bbg::Name MIC_CODE("micCode");
+    const bbg::Name EX_CODE("exchangeCode");
     const bbg::Name TICK_SIZE("size");
     const bbg::Name TIME("time");
     const bbg::Name TYPE("type");
@@ -89,6 +91,8 @@ struct Ticks {
     std::vector<double> value;
     std::vector<double> size;
     std::vector<std::string> conditionCode;
+    std::vector<std::string> exchangeCode;
+    std::vector<std::string> micCode;
 };
 
 void processMessage(bbg::Message &msg, Ticks &ticks, const bool verbose) {
@@ -96,7 +100,7 @@ void processMessage(bbg::Message &msg, Ticks &ticks, const bool verbose) {
     int numItems = data.numValues();
     if (verbose) {
         Rcpp::Rcout <<"Response contains " << numItems << " items" << std::endl;
-        Rcpp::Rcout <<"Time\t\tType\t\tValue\t\tSize\t\tCondition Code" << std::endl;
+        Rcpp::Rcout <<"Time\t\tType\t\tValue\t\tSize\t\tCondition Code\t\tExchange Code\t\tMIC Code" << std::endl;
     }
     for (int i = 0; i < numItems; ++i) {
         bbg::Element item = data.getValueAsElement(i);
@@ -106,6 +110,10 @@ void processMessage(bbg::Message &msg, Ticks &ticks, const bool verbose) {
         int size = item.getElementAsInt32(TICK_SIZE);
         std::string conditionCode;
         conditionCode = (item.hasElement(COND_CODE)) ? item.getElementAsString(COND_CODE) : "";
+        std::string exchangeCode;
+        exchangeCode = (item.hasElement(EX_CODE)) ? item.getElementAsString(EX_CODE) : "";
+        std::string micCode;
+        micCode = (item.hasElement(MIC_CODE)) ? item.getElementAsString(MIC_CODE) : "";
         if (verbose) {
             Rcpp::Rcout.setf(std::ios::fixed, std::ios::floatfield);
             Rcpp::Rcout << time.month() << '/' << time.day() << '/' << time.year()
@@ -114,14 +122,18 @@ void processMessage(bbg::Message &msg, Ticks &ticks, const bool verbose) {
                         << type << "\t\t"
                         << value << "\t\t"
                         << size << "\t\t"
-                        << conditionCode
+                        << conditionCode << "\t\t"
+                        << exchangeCode << "\t\t"
+                        << micCode << "\t\t"
                         << std::endl;
         }
         ticks.time.push_back(bbgDatetimeToUTC(time));
-        ticks.type.push_back(type);    
+        ticks.type.push_back(type);
         ticks.value.push_back(value);
         ticks.size.push_back(size);
         ticks.conditionCode.push_back(conditionCode);
+        ticks.exchangeCode.push_back(exchangeCode);
+        ticks.micCode.push_back(micCode);
     }
 }
 
@@ -143,7 +155,7 @@ Rcpp::DataFrame getTicks_Impl(SEXP con,
                               std::vector<std::string> eventType,
                               std::string startDateTime,
                               std::string endDateTime,
-                              bool setCondCodes=true,  
+                              bool setCondCodes=true,
                               bool verbose=false) {
 
     // via Rcpp Attributes we get a try/catch block with error propagation to R "for free"
@@ -164,9 +176,11 @@ Rcpp::DataFrame getTicks_Impl(SEXP con,
     for (size_t i = 0; i < eventType.size(); i++) {
         eventTypes.appendValue(eventType[i].c_str());
     }
-    
+
     request.set("includeConditionCodes", setCondCodes);
     request.set("includeNonPlottableEvents", setCondCodes);
+    request.set("includeExchangeCodes", setCondCodes);
+    request.set("includeBicMicCodes", setCondCodes);
     request.set("startDateTime", startDateTime.c_str());
     request.set("endDateTime", endDateTime.c_str());
 
@@ -200,10 +214,12 @@ Rcpp::DataFrame getTicks_Impl(SEXP con,
     }
 
     return Rcpp::DataFrame::create(Rcpp::Named("times") = createPOSIXtVector(ticks.time),
-                                   Rcpp::Named("type") = ticks.type, 
+                                   Rcpp::Named("type") = ticks.type,
                                    Rcpp::Named("value") = ticks.value,
-                                   Rcpp::Named("size")  = ticks.size, 
-    	                           Rcpp::Named("condcode") = ticks.conditionCode);
+                                   Rcpp::Named("size")  = ticks.size,
+    	                           Rcpp::Named("condcode") = ticks.conditionCode,
+    	                           Rcpp::Named("excode") = ticks.exchangeCode,
+    	                           Rcpp::Named("miccode") = ticks.micCode);
 
 }
 
