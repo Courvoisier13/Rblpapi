@@ -9,4 +9,6 @@ local/
 blp/
 inst/include/
 src/Makevars
+API docs/
+tests - K/
 .Rhistory
